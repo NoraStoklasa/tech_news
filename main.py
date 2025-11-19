@@ -10,13 +10,10 @@ load_dotenv()
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 DB_NEWS = "news.db"
-news_dict = {
-    "tech-crunch": "https://techcrunch.com/",
-    "the-verge": "https://www.theverge.com/",
-}
+news_dict = {"tech-crunch": "https://techcrunch.com/"}
 
 TECHCRUNCH_CLASS = "loop-card__title-link"
-VERGE_CLASS = "_1lkmsmo0 _1lksmo4"
+TECHCRUNCH_CLASS_PARAGRAPH = "wp-block-paragraph"
 
 
 def create_database():
@@ -51,7 +48,7 @@ def scrape_articles(news_dict):
     Returns:
         Dictionary mapping article titles to their URLs
     """
-    scraped_elements = []
+    articles_data = {}
     for website, url in news_dict.items():
         try:
             response = requests.get(url)
@@ -59,20 +56,19 @@ def scrape_articles(news_dict):
             soup = BeautifulSoup(response.text, "html.parser")
 
             if website == "tech-crunch":
-                scraped_elements.extend(soup.find_all("a", class_=TECHCRUNCH_CLASS))
-            elif website == "the-verge":
-                scraped_elements.extend(soup.find_all("a", class_=VERGE_CLASS))
+                elements = soup.find_all("a", class_=TECHCRUNCH_CLASS)
             else:
                 print(f"Unknown website: {website}")
+                continue
+
+            # Store each article with its source
+            for article in elements:
+                title = article.text.strip()
+                articles_data[title] = {"url": article["href"], "source": website}
         except requests.RequestException as e:
             print(f"Error scraping {website}: {e}")
 
-    # storing headlines and urls
-    articles_with_urls = {}
-    for article in scraped_elements:
-        articles_with_urls[article.text.strip()] = article["href"]
-
-    return articles_with_urls
+    return articles_data
 
 
 def analyse_with_ai(titles):
@@ -108,11 +104,12 @@ def analyse_with_ai(titles):
         return {"articles": []}
 
 
-def save_to_db(parsed_response):
+def save_to_db(parsed_response, articles_data):
     """Save analyzed articles to the database.
 
     Args:
         parsed_response: Dictionary containing 'articles' key with list of article data
+        articles_data: Dictionary mapping titles to their url and source
     """
     analysis_list = parsed_response.get("articles")
 
@@ -126,27 +123,151 @@ def save_to_db(parsed_response):
         for item in analysis_list:
             title = item.get("title")
             relevance = item.get("relevance")
+            article_info = articles_data.get(title, {})
+            source = article_info.get("source")
+            url = article_info.get("url")
+
             cur.execute(
-                "INSERT OR IGNORE INTO articles (title, relevance_score) VALUES (?, ?)",
-                (title, relevance),
+                "INSERT OR IGNORE INTO articles (title, relevance_score, source, url) VALUES (?, ?, ?, ?)",
+                (title, relevance, source, url),
             )
 
         conn.commit()
 
 
+def retrieve_relevant_articles(threshold=5.0):
+    """Retrieve articles with relevance score above a certain threshold."""
+    with sqlite3.connect(DB_NEWS) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT title, url, relevance_score FROM articles WHERE relevance_score >= ? AND summary IS NULL",
+            (threshold,),
+        )
+        results = cur.fetchall()
+        return results
+
+
+def fetch_article_content(url):
+    """Fetch the full content of an article from its URL."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        paragraphs = soup.find_all("p", class_=TECHCRUNCH_CLASS_PARAGRAPH)
+        content = " ".join([para.get_text() for para in paragraphs])
+        return content
+    except requests.RequestException as e:
+        print(f"Error fetching article content from {url}: {e}")
+        return ""
+
+
+def summarise_content(content):
+    """Generate a summary of article content using AI.
+
+    Args:
+        content: String containing the article text
+
+    Returns:
+        String containing the generated summary
+    """
+    prompt = (
+        """
+        You are an expert in computer science education.
+
+        Summarise the following article in simple, clear language suitable for undergraduate CS students.
+        The summary must be factual, concise, and under 100 words.
+
+        If the article contains names, companies, tools, or technical terms that students may not know,
+        add a brief explanation in square brackets, such as:
+        [OpenAI is an AI research lab], [Elon Musk is the CEO of Tesla and SpaceX].
+
+        Focus only on the core information and why it matters in the context of computing.
+        Do not include opinions, hype, or promotional content.
+
+        Article content:
+        """
+        + content
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        summary = response.choices[0].message.content
+        return summary
+    except Exception as e:
+        print(f"Error summarizing content with OpenAI API: {e}")
+        return ""
+
+
+def update_article_summary(title, summary):
+    """Update the summary field for an article in the database.
+
+    Args:
+        title: Article title to update
+        summary: Generated summary text
+    """
+    with sqlite3.connect(DB_NEWS) as conn:
+        cur = conn.cursor()
+        cur.execute("UPDATE articles SET summary = ? WHERE title = ?", (summary, title))
+        conn.commit()
+
+
+def process_relevant_articles(threshold=5.0):
+    """Fetch content, summarize, and save summaries for relevant articles.
+
+    Args:
+        threshold: Minimum relevance score to process articles
+    """
+    relevant_articles = retrieve_relevant_articles(threshold)
+
+    if not relevant_articles:
+        print("No relevant articles without summaries found")
+        return
+
+    print(f"Processing {len(relevant_articles)} relevant articles...")
+
+    for title, url, relevance in relevant_articles:
+        print(f"\nProcessing: {title[:50]}... (Relevance: {relevance})")
+
+        # Fetch article content
+        content = fetch_article_content(url)
+
+        if not content:
+            print("  ⚠️  Could not fetch content")
+            continue
+
+        # Generate summary
+        summary = summarise_content(content)
+
+        if summary:
+            # Save summary to database
+            update_article_summary(title, summary)
+            print(f"  ✓ Summary saved: {summary[:80]}...")
+        else:
+            print("  ⚠️  Could not generate summary")
+
+
 def main():
     """Main function to orchestrate the news scraping and analysis workflow."""
     create_database()
-    scraped_titles = scrape_articles(news_dict)
+    articles_data = scrape_articles(news_dict)
 
-    if not scraped_titles:
+    if not articles_data:
         print("No articles were scraped")
         return
 
-    titles = list(scraped_titles.keys())[:2]
+    # Get first 2 articles
+    titles = list(articles_data.keys())[:2]
     parsed_response = analyse_with_ai(titles)
-    save_to_db(parsed_response)
-    print(f"Successfully processed {len(titles)} articles")
+    save_to_db(parsed_response, articles_data)
+
+    # Process relevant articles: fetch content, generate summaries, save to DB
+    process_relevant_articles(threshold=5.0)
+
+    print("\n✓ Workflow complete!")
 
 
 if __name__ == "__main__":
