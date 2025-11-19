@@ -14,6 +14,7 @@ news_dict = {"tech-crunch": "https://techcrunch.com/"}
 
 TECHCRUNCH_CLASS = "loop-card__title-link"
 TECHCRUNCH_CLASS_PARAGRAPH = "wp-block-paragraph"
+TECHCRUNCH_CLASS_CATEGORY = "is-taxonomy-category"
 
 
 def create_database():
@@ -27,7 +28,6 @@ def create_database():
         source TEXT,
         url TEXT UNIQUE,
         title TEXT,
-        published_at TEXT,
         relevance_score REAL,
         category TEXT,
         summary TEXT,
@@ -126,21 +126,30 @@ def save_to_db(parsed_response, articles_data):
             article_info = articles_data.get(title, {})
             source = article_info.get("source")
             url = article_info.get("url")
+            category = fetch_article_category(url)
+            content = fetch_article_content(url) if url else None
 
             cur.execute(
-                "INSERT OR IGNORE INTO articles (title, relevance_score, source, url) VALUES (?, ?, ?, ?)",
-                (title, relevance, source, url),
+                "INSERT OR IGNORE INTO articles (title, relevance_score, source, url, category, content) VALUES (?, ?, ?, ?, ?, ?)",
+                (title, relevance, source, url, category, content),
             )
 
         conn.commit()
 
 
 def retrieve_relevant_articles(threshold=5.0):
-    """Retrieve articles with relevance score above a certain threshold."""
+    """Retrieve articles with relevance score above a threshold and valid URLs."""
     with sqlite3.connect(DB_NEWS) as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT title, url, relevance_score FROM articles WHERE relevance_score >= ? AND summary IS NULL",
+            """
+            SELECT title, url, relevance_score
+            FROM articles
+            WHERE relevance_score >= ?
+              AND summary IS NULL
+              AND url IS NOT NULL
+              AND TRIM(url) <> ''
+            """,
             (threshold,),
         )
         results = cur.fetchall()
@@ -159,6 +168,22 @@ def fetch_article_content(url):
     except requests.RequestException as e:
         print(f"Error fetching article content from {url}: {e}")
         return ""
+
+
+def fetch_article_category(url):
+    """Fetch the published date of an article from its URL."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Find the category link by class name
+        category = soup.find("a", class_=TECHCRUNCH_CLASS_CATEGORY)
+        if category:
+            return category.get_text(strip=True)
+        return None
+    except requests.RequestException as e:
+        print(f"Error fetching article category from {url}: {e}")
+        return None
 
 
 def summarise_content(content):
@@ -231,6 +256,11 @@ def process_relevant_articles(threshold=5.0):
 
     for title, url, relevance in relevant_articles:
         print(f"\nProcessing: {title[:50]}... (Relevance: {relevance})")
+
+        # Skip if URL is missing or invalid-looking
+        if not url or not isinstance(url, str) or not url.startswith("http"):
+            print("  ⚠️  Skipping - missing or invalid URL")
+            continue
 
         # Fetch article content
         content = fetch_article_content(url)
