@@ -16,6 +16,12 @@ TECHCRUNCH_CLASS = "loop-card__title-link"
 TECHCRUNCH_CLASS_PARAGRAPH = "wp-block-paragraph"
 TECHCRUNCH_CLASS_CATEGORY = "is-taxonomy-category"
 
+# Networking configuration
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+}
+REQUEST_TIMEOUT = 15  # seconds
+
 
 def create_database():
     """Create the database and articles table if it doesn't exist."""
@@ -51,7 +57,9 @@ def scrape_articles(news_dict):
     articles_data = {}
     for website, url in news_dict.items():
         try:
-            response = requests.get(url)
+            response = requests.get(
+                url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT
+            )
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
@@ -97,6 +105,8 @@ def analyse_with_ai(titles):
         )
 
         ai_answer = response.choices[0].message.content
+        if not ai_answer:
+            return {"articles": []}
         parsed_response = json.loads(ai_answer)
         return parsed_response
     except Exception as e:
@@ -130,7 +140,16 @@ def save_to_db(parsed_response, articles_data):
             content = fetch_article_content(url) if url else None
 
             cur.execute(
-                "INSERT OR IGNORE INTO articles (title, relevance_score, source, url, category, content) VALUES (?, ?, ?, ?, ?, ?)",
+                """
+                INSERT INTO articles (title, relevance_score, source, url, category, content)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(url) DO UPDATE SET
+                    title=excluded.title,
+                    relevance_score=excluded.relevance_score,
+                    source=excluded.source,
+                    category=COALESCE(excluded.category, articles.category),
+                    content=COALESCE(excluded.content, articles.content)
+                """,
                 (title, relevance, source, url, category, content),
             )
 
@@ -143,7 +162,7 @@ def retrieve_relevant_articles(threshold=5.0):
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT title, url, relevance_score
+            SELECT title, url, relevance_score, content
             FROM articles
             WHERE relevance_score >= ?
               AND summary IS NULL
@@ -159,7 +178,7 @@ def retrieve_relevant_articles(threshold=5.0):
 def fetch_article_content(url):
     """Fetch the full content of an article from its URL."""
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         paragraphs = soup.find_all("p", class_=TECHCRUNCH_CLASS_PARAGRAPH)
@@ -171,9 +190,9 @@ def fetch_article_content(url):
 
 
 def fetch_article_category(url):
-    """Fetch the published date of an article from its URL."""
+    """Fetch the category of an article from its URL."""
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         # Find the category link by class name
@@ -220,7 +239,7 @@ def summarise_content(content):
             messages=[{"role": "user", "content": prompt}],
         )
 
-        summary = response.choices[0].message.content
+        summary = response.choices[0].message.content or ""
         return summary
     except Exception as e:
         print(f"Error summarizing content with OpenAI API: {e}")
@@ -240,6 +259,13 @@ def update_article_summary(title, summary):
         conn.commit()
 
 
+def update_article_content(title, content):
+    with sqlite3.connect(DB_NEWS) as conn:
+        cur = conn.cursor()
+        cur.execute("UPDATE articles SET content = ? WHERE title = ?", (content, title))
+        conn.commit()
+
+
 def process_relevant_articles(threshold=5.0):
     """Fetch content, summarize, and save summaries for relevant articles.
 
@@ -254,7 +280,7 @@ def process_relevant_articles(threshold=5.0):
 
     print(f"Processing {len(relevant_articles)} relevant articles...")
 
-    for title, url, relevance in relevant_articles:
+    for title, url, relevance, existing_content in relevant_articles:
         print(f"\nProcessing: {title[:50]}... (Relevance: {relevance})")
 
         # Skip if URL is missing or invalid-looking
@@ -262,8 +288,11 @@ def process_relevant_articles(threshold=5.0):
             print("  ⚠️  Skipping - missing or invalid URL")
             continue
 
-        # Fetch article content
-        content = fetch_article_content(url)
+        # Use existing content if present, otherwise fetch and persist
+        content = existing_content if existing_content else fetch_article_content(url)
+
+        if content and not existing_content:
+            update_article_content(title, content)
 
         if not content:
             print("  ⚠️  Could not fetch content")
