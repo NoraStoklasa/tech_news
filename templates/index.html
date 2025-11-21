@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+    <title>NEWS</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <div>
+          <h1>Short tech news for CS students</h1>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <ul>
+        {% for article in articles %}
+        <li>
+          <h2>{{ article.title }}</h2>
+
+          {{ article.summary }}
+
+          <br />
+          <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer"
+            >Read full article</a
+          >
+          <p class="article-date">Published on: {{ article.created_at }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if articles|length == 0 %}
+      <p>No articles found.</p>
+      {% endif %}
+    </main>
+
+    <footer>
+      <p>&copy; 2025 Tech News</p>
+    </footer>
+  </body>
+</html>

@@ -17,7 +17,7 @@ def main():
         return
 
     # Get first 2 articles
-    titles = list(articles_data.keys())[:2]
+    titles = list(articles_data.keys())[:5]
     parsed_response = analyse_with_ai(titles)
     save_to_db(parsed_response, articles_data)
 
@@ -29,3 +29,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("Starting web server...")
+    from server import app
+
+    app.run(debug=False, host="127.0.0.1", port=5000)

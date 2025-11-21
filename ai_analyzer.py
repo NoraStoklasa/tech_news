@@ -52,15 +52,25 @@ def summarise_content(content):
         """
         You are an expert in computer science education.
 
-        Summarise the following article in simple, clear language suitable for undergraduate CS students.
-        The summary must be factual, concise, and under 100 words.
+        TASK: Produce a factual summary (under 100 words) of the article content for undergraduate CS students.
 
-        If the article contains names, companies, tools, or technical terms that students may not know,
-        add a brief explanation in square brackets, such as:
-        [OpenAI is an AI research lab], [Elon Musk is the CEO of Tesla and SpaceX].
+        MANDATORY BRACKET RULE:
+        For EVERY proper noun or specialized technical term that appears (companies, products, people, protocols, libraries, standards, algorithms), immediately follow it ONCE with a concise explanation in square brackets. Examples:
+        OpenAI [an AI research organization]
+        Elon Musk [CEO of Tesla and SpaceX]
+        Kubernetes [an open-source container orchestration system]
+        TLS [a cryptographic protocol securing network communication]
 
-        Focus only on the core information and why it matters in the context of computing.
-        Do not include opinions, hype, or promotional content.
+        Formatting requirements:
+        1. Integrate bracketed explanations inline right after the term (no footnotes).
+        2. Use each bracket only once per unique term.
+        3. Keep each bracket explanation under 10 words.
+        4. Do NOT skip brackets even if the term seems common.
+        5. If absolutely no proper nouns or technical terms exist, add one bracketed clarification for the most significant concept.
+
+        Prohibited: marketing language, speculation, opinions, filler.
+
+        Return ONLY the summary text (no preamble, no closing statements).
 
         Article content:
         """
@@ -74,6 +84,23 @@ def summarise_content(content):
         )
 
         summary = response.choices[0].message.content or ""
+        # Fallback: if model failed to include any bracketed explanations, attempt a reinforcement prompt.
+        if "[" not in summary:
+            retry_prompt = (
+                "Rewrite the summary adding bracketed explanations after every proper noun or technical term. "
+                "Ensure at least three bracketed explanations. Keep under 100 words. Original summary: "
+                + summary
+            )
+            try:
+                retry_response = client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[{"role": "user", "content": retry_prompt}],
+                )
+                retry_summary = retry_response.choices[0].message.content or summary
+                if "[" in retry_summary:
+                    summary = retry_summary
+            except Exception:
+                pass
         return summary
     except Exception as e:
         print(f"Error summarizing content with OpenAI API: {e}")
