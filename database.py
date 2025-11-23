@@ -19,10 +19,20 @@ def create_database():
         category TEXT,
         summary TEXT,
         content TEXT,
+        image_url TEXT,
+        image_alt TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
 
         cur.execute(table_creation_query)
+
+        # Ensure new columns exist if table was previously created without them
+        cur.execute("PRAGMA table_info(articles)")
+        existing_columns = {row[1] for row in cur.fetchall()}
+        if "image_alt" not in existing_columns:
+            cur.execute("ALTER TABLE articles ADD COLUMN image_alt TEXT")
+        if "image_url" not in existing_columns:
+            cur.execute("ALTER TABLE articles ADD COLUMN image_url TEXT")
         conn.commit()
 
 
@@ -33,7 +43,11 @@ def save_to_db(parsed_response, articles_data):
         parsed_response: Dictionary containing 'articles' key with list of article data
         articles_data: Dictionary mapping titles to their url and source
     """
-    from scraper import fetch_article_category, fetch_article_content
+    from scraper import (
+        fetch_article_category,
+        fetch_article_content,
+        fetch_article_image,
+    )
 
     analysis_list = parsed_response.get("articles")
 
@@ -52,19 +66,31 @@ def save_to_db(parsed_response, articles_data):
             url = article_info.get("url")
             category = fetch_article_category(url)
             content = fetch_article_content(url) if url else None
+            image_url, image_alt = fetch_article_image(url) if url else (None, None)
 
             cur.execute(
                 """
-                INSERT INTO articles (title, relevance_score, source, url, category, content)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO articles (title, relevance_score, source, url, category, content, image_url, image_alt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     title=excluded.title,
                     relevance_score=excluded.relevance_score,
                     source=excluded.source,
                     category=COALESCE(excluded.category, articles.category),
-                    content=COALESCE(excluded.content, articles.content)
+                    content=COALESCE(excluded.content, articles.content),
+                    image_url=COALESCE(excluded.image_url, articles.image_url),
+                    image_alt=COALESCE(excluded.image_alt, articles.image_alt)
                 """,
-                (title, relevance, source, url, category, content),
+                (
+                    title,
+                    relevance,
+                    source,
+                    url,
+                    category,
+                    content,
+                    image_url,
+                    image_alt,
+                ),
             )
 
         conn.commit()

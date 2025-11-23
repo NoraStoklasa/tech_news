@@ -20,6 +20,7 @@ news_dict = {"tech-crunch": "https://techcrunch.com/"}
 TECHCRUNCH_CLASS = "loop-card__title-link"
 TECHCRUNCH_CLASS_PARAGRAPH = "wp-block-paragraph"
 TECHCRUNCH_CLASS_CATEGORY = "is-taxonomy-category"
+TECHCRUNCH_CLASS_IMAGE = "wp-post-image"
 
 # Networking configuration
 REQUEST_HEADERS = {

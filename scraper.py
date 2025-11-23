@@ -8,6 +8,7 @@ from config import (
     TECHCRUNCH_CLASS,
     TECHCRUNCH_CLASS_PARAGRAPH,
     TECHCRUNCH_CLASS_CATEGORY,
+    TECHCRUNCH_CLASS_IMAGE,
 )
 
 
@@ -73,3 +74,23 @@ def fetch_article_category(url):
     except requests.RequestException as e:
         print(f"Error fetching article category from {url}: {e}")
         return None
+
+
+def fetch_article_image(url):
+    """Fetch the featured image URL and alt text from an article URL.
+
+    Returns:
+        (image_url, image_alt) tuple; values may be None.
+    """
+    try:
+        response = requests.get(url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Find the featured image by class name
+        image = soup.find("img", class_=TECHCRUNCH_CLASS_IMAGE)
+        if image:
+            return image.get("src"), image.get("alt")
+        return (None, None)
+    except requests.RequestException as e:
+        print(f"Error fetching article image from {url}: {e}")
+        return (None, None)

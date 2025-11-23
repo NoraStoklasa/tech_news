@@ -7,30 +7,72 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='styles.css') }}"
     />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nova+Mono&family=Orbitron:wght@400..900&display=swap"
+      rel="stylesheet"
+    />
+
     <title>NEWS</title>
   </head>
+
   <body>
     <header class="site-header">
-      <div class="header-inner">
-        <div>
-          <h1>Short tech news for CS students</h1>
+      <div class="brand-row">
+        <img
+          src="{{ url_for('static', filename='assets/logo.png') }}"
+          alt="ByteFeed logo"
+          class="brand-logo"
+        />
+        <div class="brand-text">
+          <h1>ByteFeed</h1>
+          <p class="site-tagline">Short tech news for CS students</p>
         </div>
       </div>
     </header>
 
-    <main>
+    <main class="news_container">
       <ul>
         {% for article in articles %}
         <li>
           <h2>{{ article.title }}</h2>
-
-          {{ article.summary }}
-
-          <br />
-          <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer"
-            >Read full article</a
-          >
-          <p class="article-date">Published on: {{ article.created_at }}</p>
+          <div class="article-row">
+            <div class="article-text">
+              <p class="summary-text">
+                <span class="summary-short">{{ article.first_sentence }}</span>
+                <span class="summary-full" style="display: none"
+                  >{{ article.summary }}</span
+                >
+                {% if article.summary != article.first_sentence %}
+                <a
+                  href="#"
+                  class="read-more-link"
+                  onclick="toggleSummary(event, this)"
+                  >Read more</a
+                >
+                {% endif %}
+              </p>
+              <a
+                href="{{ article.url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Read full article</a
+              >
+              <p class="article-date">Published on: {{ article.created_at }}</p>
+              <p class="article-category">Category: {{ article.category }}</p>
+            </div>
+            <div class="article-media">
+              {% if article.image_url %}
+              <img
+                src="{{ article.image_url }}"
+                alt="{{ article.image_alt or article.title }}"
+                class="article-image"
+              />
+              {% endif %}
+            </div>
+          </div>
         </li>
         {% endfor %}
       </ul>
@@ -40,7 +82,36 @@
     </main>
 
     <footer>
-      <p>&copy; 2025 Tech News</p>
+      <p>&copy; 2025 by Nora Stoklast</p>
     </footer>
+
+    <script>
+      let expandedSummary = null
+
+      function toggleSummary(event, link) {
+        event.preventDefault()
+        const summaryText = link.closest('.summary-text')
+        const shortText = summaryText.querySelector('.summary-short')
+        const fullText = summaryText.querySelector('.summary-full')
+
+        // Collapse previously opened summary if it's different
+        if (expandedSummary && expandedSummary !== summaryText) {
+          const prevShort = expandedSummary.querySelector('.summary-short')
+          const prevFull = expandedSummary.querySelector('.summary-full')
+          const prevLink = expandedSummary.querySelector('.read-more-link')
+          prevShort.style.display = 'inline'
+          prevFull.style.display = 'none'
+          if (prevLink) prevLink.textContent = 'Read more'
+        }
+
+        const isOpening = fullText.style.display === 'none'
+
+        shortText.style.display = isOpening ? 'none' : 'inline'
+        fullText.style.display = isOpening ? 'inline' : 'none'
+        link.textContent = isOpening ? 'Read less' : 'Read more'
+
+        expandedSummary = isOpening ? summaryText : null
+      }
+    </script>
   </body>
 </html>

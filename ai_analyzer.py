@@ -88,7 +88,7 @@ def summarise_content(content):
         if "[" not in summary:
             retry_prompt = (
                 "Rewrite the summary adding bracketed explanations after every proper noun or technical term. "
-                "Ensure at least three bracketed explanations. Keep under 100 words. Original summary: "
+                "Ensure at least three bracketed explanations. Keep under 150 words. Original summary: "
                 + summary
             )
             try:
