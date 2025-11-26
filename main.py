@@ -16,9 +16,20 @@ def main():
         print("No articles were scraped")
         return
 
-    # Get first 2 articles
-    titles = list(articles_data.keys())[:5]
-    parsed_response = analyse_with_ai(titles)
+    # Mix articles from different sources evenly
+    tc_articles = [
+        (t, d) for t, d in articles_data.items() if d["source"] == "tech-crunch"
+    ]
+    wired_articles = [
+        (t, d) for t, d in articles_data.items() if d["source"] == "wired"
+    ]
+
+    # Take 5 from each source
+    mixed_titles = []
+    mixed_titles.extend([t for t, d in tc_articles[:5]])
+    mixed_titles.extend([t for t, d in wired_articles[:5]])
+
+    parsed_response = analyse_with_ai(mixed_titles)
     save_to_db(parsed_response, articles_data)
 
     # Process relevant articles: fetch content, generate summaries, save to DB
