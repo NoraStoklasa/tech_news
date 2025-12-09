@@ -55,7 +55,7 @@ def summarise_content(content):
         TASK: Produce a factual summary (under 100 words) of the article content for undergraduate CS students.
 
         MANDATORY BRACKET RULE:
-        For EVERY proper noun or specialized technical term that appears (companies, products, people, protocols, libraries, standards, algorithms), immediately follow it ONCE with a concise explanation in square brackets. Examples:
+        For some unknown noun or specialized technical term that appears and isn't that well known (companies, products, people, protocols, libraries, standards, algorithms), immediately follow it ONCE with a concise explanation in square brackets. Examples:
         OpenAI [an AI research organization]
         Elon Musk [CEO of Tesla and SpaceX]
         Kubernetes [an open-source container orchestration system]
