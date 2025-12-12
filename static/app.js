@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!container || !articlesList || !sentinel) return
 
   const emptyState = document.getElementById('empty-state')
-  const pageSize = parseInt(container.dataset.initialLimit || '10', 10)
+  const pageSize = parseInt(container.dataset.initialLimit || '5', 10)
   let nextOffset = parseInt(container.dataset.nextOffset || '0', 10)
   let hasMore = (container.dataset.hasMore || 'false') === 'true'
   let loading = false

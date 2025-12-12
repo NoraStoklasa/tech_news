@@ -51,7 +51,7 @@ def serialize_article(row):
 # Serve index.html using Jinja and pass articles
 @app.route("/")
 def index():
-    initial_limit = 10
+    initial_limit = 5
     articles = fetch_articles_from_db(limit=initial_limit)
     articles_list = [serialize_article(row) for row in articles]
     return render_template(
@@ -64,9 +64,9 @@ def index():
 @app.route("/api/articles")
 def api_articles():
     try:
-        limit = int(request.args.get("limit", 10))
+        limit = int(request.args.get("limit", 5))
     except ValueError:
-        limit = 10
+        limit = 5
 
     try:
         offset = int(request.args.get("offset", 0))

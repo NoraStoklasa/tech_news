@@ -41,7 +41,7 @@
     <main
       id="news-container"
       class="news_container"
-      data-initial-limit="{{ initial_limit if initial_limit is defined else 10 }}"
+      data-initial-limit="{{ initial_limit if initial_limit is defined else 5 }}"
       data-next-offset="{{ articles|length if articles is defined else 0 }}"
       data-has-more="{{ 'true' if articles|length >= (initial_limit or 10) else 'false' }}"
     >
