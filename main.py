@@ -1,6 +1,6 @@
 """Main orchestration script for the tech news scraper."""
 
-from config import news_dict
+from config import news_dict, DEFAULT_RELEVANCE_THRESHOLD
 from database import create_database, save_to_db
 from scraper import scrape_articles
 from ai_analyzer import analyse_with_ai
@@ -33,7 +33,7 @@ def main():
     save_to_db(parsed_response, articles_data)
 
     # Process relevant articles: fetch content, generate summaries, save to DB
-    process_relevant_articles(threshold=5.0)
+    process_relevant_articles(threshold=DEFAULT_RELEVANCE_THRESHOLD)
 
     print("\n✓ Workflow complete!")
 

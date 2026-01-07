@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template, request
 import sqlite3
-from config import DB_NEWS
+from config import DB_NEWS, DEFAULT_RELEVANCE_THRESHOLD
 import re
 
 
@@ -74,9 +74,11 @@ def api_articles():
         offset = 0
 
     try:
-        min_relevance = float(request.args.get("min_relevance", 5.0))
+        min_relevance = float(
+            request.args.get("min_relevance", DEFAULT_RELEVANCE_THRESHOLD)
+        )
     except ValueError:
-        min_relevance = 5.0
+        min_relevance = DEFAULT_RELEVANCE_THRESHOLD
 
     # Fetch one extra record to know if there are more
     rows = fetch_articles_from_db(
@@ -95,4 +97,4 @@ def api_articles():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=False, port=5001)
