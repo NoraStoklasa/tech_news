@@ -194,31 +194,6 @@ Edit `config.py`, `main.py`, `server.py`, and `static/app.js` – search for bat
 - Frontend uses vanilla JavaScript with IntersectionObserver for scroll detection
 - Backend uses Flask with Jinja2 templating
 
-## Troubleshooting
-
-**No articles appearing?**
-
-- Check `.env` has a valid `OPENAI_API_KEY`
-- Verify TechCrunch and Wired are accessible (not geo-blocked)
-- Run `python -c "from config import client; print('API OK')"` to validate the client
-
-**Summaries not saving?**
-
-- Articles must have `relevance_score >= 5.0` to be processed
-- Run `python -c "from content_processor import process_relevant_articles; process_relevant_articles(threshold=0.0)"` to summarize all articles regardless of relevance
-
-**Database issues?**
-
-- Delete `news.db` to reset (will be recreated on next run)
-- Use `sqlite3 news.db` to inspect the database directly
-
-## LinkedIn Project Description
-
-A fully automated Python web application that delivers beginner-friendly tech news digests for computer science students. Scrapes headlines from TechCrunch and Wired, uses OpenAI's GPT-4 to rate relevance for CS students, and generates concise summaries. Includes a web UI with endless scroll, SQLite storage, and can be scheduled to run daily via cron or GitHub Actions.
-
-**Tech Stack:** Python, Flask, BeautifulSoup, OpenAI API, SQLite, JavaScript
-
-**GitHub:** https://github.com/NoraStoklasa/tech_news
 
 ---
 
